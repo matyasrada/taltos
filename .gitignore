@@ -1,0 +1,17 @@
+# virtual environment
+.venv/
+
+# python cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# secrets (never commit API keys)
+.env
+
+# editor / os
+.DS_Store
+.vscode/
+.idea/
