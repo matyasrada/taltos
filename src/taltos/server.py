@@ -1,14 +1,15 @@
 """táltos MCP server - exposes Gemini and Grok as tools to Claude Code."""
 
 import os
+from pathlib import Path
 from typing import Literal
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from openai import AsyncOpenAI
 
-# loading api keys
-load_dotenv()
+# loading api keys from repo-root .env regardless of CWD
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 # táltos
 mcp = FastMCP("táltos")
