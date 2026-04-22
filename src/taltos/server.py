@@ -26,8 +26,17 @@ grok = AsyncOpenAI(
 
 
 @mcp.tool()
-async def ask_gemini(prompt: str, model: str = "gemini-2.0-flash") -> str:
-    """Send a prompt to Google Gemini and return its response."""
+async def ask_gemini(
+    prompt: str,
+    model: Literal[
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+    ] = "gemini-2.5-flash",
+) -> str:
+    """Send a prompt to Google Gemini and return its response.
+    Defaults to gemini-2.5-flash for general use.
+    Use gemini-2.5-flash-lite when the prompt is short/simple and cost matters.
+    """
     response = await gemini.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
