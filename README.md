@@ -25,6 +25,10 @@ claude mcp list  # taltos ✓ Connected
 
 ## tools
 
-- **ask_gemini(prompt, model)** : defaults to `gemini-2.0-flash`
+- **ask_gemini(prompt, model)** : `gemini-2.5-flash` (default) or `gemini-2.5-flash-lite`
 - **ask_grok(prompt, model)** : `grok-4-fast-non-reasoning` (default) or `grok-4-fast-reasoning`
 - **hello(name)** : hello world
+
+## license
+
+MIT

@@ -3,6 +3,8 @@ name = "taltos"
 version = "0.1.0"
 description = "Multi-model MCP server exposing Gemini and Grok as tools to Claude Code"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [
     { name = "Mátyás Rada" },
