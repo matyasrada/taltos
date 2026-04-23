@@ -1,6 +1,7 @@
 """táltos MCP server - exposes Gemini and Grok as tools to Claude Code."""
 
 import os
+import sys
 from pathlib import Path
 from typing import Literal
 
@@ -11,56 +12,77 @@ from openai import AsyncOpenAI
 # loading api keys from repo-root .env regardless of CWD
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
+# api keys
+gemini_api_key = os.getenv("GEMINI_API_KEY")
+xai_api_key = os.getenv("XAI_API_KEY")
+
+gemini: AsyncOpenAI | None = None
+grok: AsyncOpenAI | None = None
+
+if gemini_api_key:
+    gemini = AsyncOpenAI(
+        api_key=gemini_api_key,
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    )
+    print("Gemini client loaded successfully", file=sys.stderr)
+else:
+    print("GEMINI_API_KEY not found → ask_gemini tool will be disabled", file=sys.stderr)
+
+if xai_api_key:
+    grok = AsyncOpenAI(
+        api_key=xai_api_key,
+        base_url="https://api.x.ai/v1/",
+    )
+    print("Grok client loaded successfully", file=sys.stderr)
+else:
+    print("XAI_API_KEY not found → ask_grok tool will be disabled", file=sys.stderr)
+
+if gemini is None and grok is None:
+    raise SystemExit("No API keys found!\n" "Copy .env.example to .env and add at least one key")
+
 # táltos
 mcp = FastMCP("táltos")
 
-gemini = AsyncOpenAI(
-    api_key=os.environ["GEMINI_API_KEY"],
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-)
+if gemini is not None:
 
-grok = AsyncOpenAI(
-    api_key=os.environ["XAI_API_KEY"],
-    base_url="https://api.x.ai/v1/",
-)
-
-
-@mcp.tool()
-async def ask_gemini(
-    prompt: str,
-    model: Literal[
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
-    ] = "gemini-2.5-flash",
-) -> str:
-    """Send a prompt to Google Gemini and return its response.
-    Defaults to gemini-2.5-flash for general use.
-    Use gemini-2.5-flash-lite when the prompt is short/simple and cost matters.
-    """
-    response = await gemini.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return response.choices[0].message.content
+    @mcp.tool()
+    async def ask_gemini(
+        prompt: str,
+        model: Literal[
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+        ] = "gemini-2.5-flash",
+    ) -> str:
+        """Send a prompt to Google Gemini and return its response.
+        Defaults to gemini-2.5-flash for general use.
+        Use gemini-2.5-flash-lite when the prompt is short/simple and cost matters.
+        """
+        response = await gemini.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content
 
 
-@mcp.tool()
-async def ask_grok(
-    prompt: str,
-    model: Literal[
-        "grok-4-fast-non-reasoning",
-        "grok-4-fast-reasoning",
-    ] = "grok-4-fast-non-reasoning",
-) -> str:
-    """Send a prompt to xAI Grok and return its response.
-    Defaults to grok-4-fast-non-reasoning (cheapest, fastest) for general use.
-    Use grok-4-fast-reasoning when the problem needs step-by-step reasoning.
-    """
-    response = await grok.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return response.choices[0].message.content
+if grok is not None:
+
+    @mcp.tool()
+    async def ask_grok(
+        prompt: str,
+        model: Literal[
+            "grok-4-fast-non-reasoning",
+            "grok-4-fast-reasoning",
+        ] = "grok-4-fast-non-reasoning",
+    ) -> str:
+        """Send a prompt to xAI Grok and return its response.
+        Defaults to grok-4-fast-non-reasoning (cheapest, fastest) for general use.
+        Use grok-4-fast-reasoning when the problem needs step-by-step reasoning.
+        """
+        response = await grok.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content
 
 
 @mcp.tool()
