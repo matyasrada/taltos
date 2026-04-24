@@ -27,6 +27,7 @@ claude mcp list  # taltos ✓ Connected
 
 - **ask_gemini(prompt, model)** : `gemini-2.5-flash` (default) or `gemini-2.5-flash-lite`
 - **ask_grok(prompt, model)** : `grok-4-fast-non-reasoning` (default) or `grok-4-fast-reasoning`
+- **ensemble(prompt)** : sends prompt to gemini and grok in parallel, returns both responses labeled
 - **hello(name)** : hello world
 
 ## license
