@@ -1,5 +1,6 @@
 """táltos MCP server - exposes Gemini and Grok as tools to Claude Code."""
 
+import asyncio
 import os
 import sys
 from pathlib import Path
@@ -83,6 +84,43 @@ if grok is not None:
             messages=[{"role": "user", "content": prompt}],
         )
         return response.choices[0].message.content
+
+
+PROVIDERS = []
+if gemini is not None:
+    PROVIDERS.append(("Gemini", gemini, "gemini-2.5-flash"))
+if grok is not None:
+    PROVIDERS.append(("Grok", grok, "grok-4-fast-non-reasoning"))
+
+if len(PROVIDERS) >= 2:
+
+    @mcp.tool()
+    async def ensemble(prompt: str) -> str:
+        """
+        Send the same prompt to different models in parallel; return
+        each responses labeled. Use when asked to cross-validate a
+        claim, compare model perspectives. Costs both API calls.
+        """
+        tasks = [
+            client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            for _, client, model in PROVIDERS
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        def render(label, model, resp):
+            if isinstance(resp, Exception):
+                return f"## {label} ({model})\n[error: {type(resp).__name__}: {resp}]"
+            content = resp.choices[0].message.content or "(empty response)"
+            return f"## {label} ({model})\n{content}"
+
+        blocks = [
+            render(label, model, resp)
+            for (label, _, model), resp in zip(PROVIDERS, results, strict=False)
+        ]
+        return "\n\n".join(blocks)
 
 
 @mcp.tool()
