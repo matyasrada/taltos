@@ -1,4 +1,4 @@
-"""táltos MCP server - exposes Gemini and Grok as tools to Claude Code."""
+"""táltos MCP server - exposes Gemini, Grok, and Ollama as tools to Claude Code."""
 
 import asyncio
 import os
@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Literal
 
+import httpx
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 from openai import AsyncOpenAI
@@ -38,8 +39,34 @@ if xai_api_key:
 else:
     print("XAI_API_KEY not found → ask_grok tool will be disabled", file=sys.stderr)
 
-if gemini is None and grok is None:
-    raise SystemExit("No API keys found!\n" "Copy .env.example to .env and add at least one key")
+# ollama is keyless. probe the local daemon to discover installed models
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+ollama: AsyncOpenAI | None = None
+ollama_models: list[str] = []
+
+try:
+    _tags = httpx.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=2.0)
+    _tags.raise_for_status()
+    ollama_models = [m["name"] for m in _tags.json().get("models", [])]
+except Exception as e:
+    print(
+        f"Ollama not reachable at {OLLAMA_BASE_URL} ({type(e).__name__}) "
+        "→ ask_ollama tool will be disabled",
+        file=sys.stderr,
+    )
+
+if ollama_models:
+    ollama = AsyncOpenAI(
+        api_key="ollama",  # ignored by the server, but required non-empty by the SDK
+        base_url=f"{OLLAMA_BASE_URL}/v1",
+    )
+    print(
+        f"Ollama client loaded ({len(ollama_models)} models: {', '.join(ollama_models)})",
+        file=sys.stderr,
+    )
+
+if gemini is None and grok is None and ollama is None:
+    raise SystemExit("No providers available!\nAdd API keys to .env or start the Ollama daemon.")
 
 # táltos
 mcp = FastMCP("táltos")
@@ -86,11 +113,33 @@ if grok is not None:
         return response.choices[0].message.content
 
 
+if ollama is not None:
+    OllamaModel = Literal[*ollama_models]
+    default_ollama_model = "llama3.2:3b" if "llama3.2:3b" in ollama_models else ollama_models[0]
+
+    @mcp.tool()
+    async def ask_ollama(
+        prompt: str,
+        model: OllamaModel = default_ollama_model,
+    ) -> str:
+        """Send a prompt to a local Ollama model and return its response.
+        Model list is discovered at server startup from the local Ollama daemon.
+        Local inference.
+        """
+        response = await ollama.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.choices[0].message.content
+
+
 PROVIDERS = []
 if gemini is not None:
     PROVIDERS.append(("Gemini", gemini, "gemini-2.5-flash"))
 if grok is not None:
     PROVIDERS.append(("Grok", grok, "grok-4-fast-non-reasoning"))
+if ollama is not None:
+    PROVIDERS.append(("Ollama", ollama, default_ollama_model))
 
 if len(PROVIDERS) >= 2:
 
